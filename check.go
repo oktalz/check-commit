@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -15,7 +14,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/go-github/v35/github"
+	"github.com/google/go-github/v56/github"
 
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
@@ -244,7 +243,7 @@ func LoadCommitPolicy(filename string) (CommitPolicyConfig, error) {
 
 	var config string
 
-	if data, err := ioutil.ReadFile(filename); err != nil {
+	if data, err := os.ReadFile(filename); err != nil {
 		log.Printf("warning: using built-in fallback configuration with HAProxy defaults (%s)", err)
 
 		config = defaultConf
@@ -297,7 +296,13 @@ func getGithubCommitSubjects() ([]string, error) {
 
 		subjects := []string{}
 		for _, c := range commits {
-			l := strings.SplitN(c.Commit.GetMessage(), "\n", 2)
+			l := strings.SplitN(c.Commit.GetMessage(), "\n", 3)
+			hash := c.Commit.GetSHA()[:8]
+			if len(l) > 1 {
+				if l[1] != "" {
+					return nil, fmt.Errorf("empty line between subject and body is required: [%s] %s", hash, l[0])
+				}
+			}
 			if len(l) > 0 {
 				subjects = append(subjects, l[0])
 			}
@@ -335,8 +340,13 @@ func getGitlabCommitSubjects() ([]string, error) {
 
 	subjects := []string{}
 	for _, c := range commits {
-		l := strings.SplitN(c.Message, "\n", 2)
+		l := strings.SplitN(c.Message, "\n", 3)
 		if len(l) > 0 {
+			if len(l) > 1 {
+				if l[1] != "" {
+					return nil, fmt.Errorf("empty line between subject and body is required: [%s] %s", c.ShortID, l[0])
+				}
+			}
 			subjects = append(subjects, l[0])
 		}
 	}
