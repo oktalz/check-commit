@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -14,11 +15,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"check-commit/aspell"
+
 	"github.com/google/go-github/v56/github"
 
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 type patchTypeT struct {
@@ -39,7 +42,7 @@ type CommitPolicyConfig struct {
 }
 
 const (
-	defaultConf = `
+	defaultConfig = `
 ---
 HelpText: "Please refer to https://github.com/haproxy/haproxy/blob/master/CONTRIBUTING#L632"
 PatchScopes:
@@ -246,7 +249,7 @@ func LoadCommitPolicy(filename string) (CommitPolicyConfig, error) {
 	if data, err := os.ReadFile(filename); err != nil {
 		log.Printf("warning: using built-in fallback configuration with HAProxy defaults (%s)", err)
 
-		config = defaultConf
+		config = defaultConfig
 	} else {
 		config = string(data)
 	}
@@ -258,7 +261,7 @@ func LoadCommitPolicy(filename string) (CommitPolicyConfig, error) {
 	return commitPolicy, nil
 }
 
-func getGithubCommitSubjects() ([]string, error) {
+func getGithubCommitData() ([]string, []string, []map[string]string, error) {
 	token := os.Getenv("API_TOKEN")
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	ref := os.Getenv("GITHUB_REF")
@@ -275,26 +278,28 @@ func getGithubCommitSubjects() ([]string, error) {
 	if event == "pull_request" {
 		repoSlice := strings.SplitN(repo, "/", 2)
 		if len(repoSlice) < 2 {
-			return nil, fmt.Errorf("error fetching owner and project from repo %s", repo)
+			return nil, nil, nil, fmt.Errorf("error fetching owner and project from repo %s", repo)
 		}
 		owner := repoSlice[0]
 		project := repoSlice[1]
 
 		refSlice := strings.SplitN(ref, "/", 4)
 		if len(refSlice) < 3 {
-			return nil, fmt.Errorf("error fetching pr from ref %s", ref)
+			return nil, nil, nil, fmt.Errorf("error fetching pr from ref %s", ref)
 		}
 		prNo, err := strconv.Atoi(refSlice[2])
 		if err != nil {
-			return nil, fmt.Errorf("Error fetching pr number from %s: %w", refSlice[2], err)
+			return nil, nil, nil, fmt.Errorf("Error fetching pr number from %s: %w", refSlice[2], err)
 		}
 
 		commits, _, err := githubClient.PullRequests.ListCommits(ctx, owner, project, prNo, &github.ListOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching commits: %w", err)
+			return nil, nil, nil, fmt.Errorf("error fetching commits: %w", err)
 		}
 
 		subjects := []string{}
+		messages := []string{}
+		diffs := []map[string]string{}
 		for _, c := range commits {
 			l := strings.SplitN(c.Commit.GetMessage(), "\n", 3)
 			hash := c.Commit.GetSHA()
@@ -303,21 +308,49 @@ func getGithubCommitSubjects() ([]string, error) {
 			}
 			if len(l) > 1 {
 				if l[1] != "" {
-					return nil, fmt.Errorf("empty line between subject and body is required: %s %s", hash, l[0])
+					return nil, nil, nil, fmt.Errorf("empty line between subject and body is required: %s %s", hash, l[0])
 				}
 			}
 			if len(l) > 0 {
 				log.Printf("detected message %s from commit %s", l[0], hash)
 				subjects = append(subjects, l[0])
+				messages = append(messages, c.Commit.GetMessage())
 			}
+
+			files, _, err := githubClient.PullRequests.ListFiles(ctx, owner, project, prNo, &github.ListOptions{})
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error fetching files: %w", err)
+			}
+			content := map[string]string{}
+			for _, file := range files {
+				if _, ok := content[file.GetFilename()]; ok {
+					continue
+				}
+				content[file.GetFilename()] = cleanGitPatch(file.GetPatch())
+			}
+			diffs = append(diffs, content)
 		}
-		return subjects, nil
+		return subjects, messages, diffs, nil
 	} else {
-		return nil, fmt.Errorf("unsupported event name: %s", event)
+		return nil, nil, nil, fmt.Errorf("unsupported event name: %s", event)
 	}
 }
 
-func getGitlabCommitSubjects() ([]string, error) {
+func cleanGitPatch(patch string) string {
+	var cleanedPatch strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(patch))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "+") {
+			cleanedPatch.WriteString(line)
+			cleanedPatch.WriteString("\n")
+		}
+	}
+	patch = cleanedPatch.String()
+	return patch
+}
+
+func getGitlabCommitData() ([]string, []string, []map[string]string, error) {
 	gitlab_url := os.Getenv("CI_API_V4_URL")
 	token := os.Getenv("API_TOKEN")
 	mri := os.Getenv("CI_MERGE_REQUEST_IID")
@@ -330,43 +363,58 @@ func getGitlabCommitSubjects() ([]string, error) {
 
 	mrIID, err := strconv.Atoi(mri)
 	if err != nil {
-		return nil, fmt.Errorf("invalid merge request id %s", mri)
+		return nil, nil, nil, fmt.Errorf("invalid merge request id %s", mri)
 	}
 
 	projectID, err := strconv.Atoi(project)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project id %s", project)
+		return nil, nil, nil, fmt.Errorf("invalid project id %s", project)
 	}
 	commits, _, err := gitlabClient.MergeRequests.GetMergeRequestCommits(projectID, mrIID, &gitlab.GetMergeRequestCommitsOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error fetching commits: %w", err)
+		return nil, nil, nil, fmt.Errorf("error fetching commits: %w", err)
 	}
 
 	subjects := []string{}
+	messages := []string{}
+	diffs := []map[string]string{}
 	for _, c := range commits {
 		l := strings.SplitN(c.Message, "\n", 3)
 		hash := c.ShortID
 		if len(l) > 0 {
 			if len(l) > 1 {
 				if l[1] != "" {
-					return nil, fmt.Errorf("empty line between subject and body is required: %s %s", hash, l[0])
+					return nil, nil, nil, fmt.Errorf("empty line between subject and body is required: %s %s", hash, l[0])
 				}
 			}
 			log.Printf("detected message %s from commit %s", l[0], hash)
 			subjects = append(subjects, l[0])
+			messages = append(messages, c.Message)
+			diff, _, err := gitlabClient.MergeRequests.ListMergeRequestDiffs(projectID, mrIID, &gitlab.ListMergeRequestDiffsOptions{})
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error fetching commit changes: %w", err)
+			}
+			content := map[string]string{}
+			for _, d := range diff {
+				if _, ok := content[d.NewPath]; ok {
+					continue
+				}
+				content[d.NewPath] = cleanGitPatch(d.Diff)
+			}
+			diffs = append(diffs, content)
 		}
 	}
 
-	return subjects, nil
+	return subjects, messages, diffs, nil
 }
 
-func getCommitSubjects(repoEnv string) ([]string, error) {
+func getCommitData(repoEnv string) ([]string, []string, []map[string]string, error) {
 	if repoEnv == GITHUB {
-		return getGithubCommitSubjects()
+		return getGithubCommitData()
 	} else if repoEnv == GITLAB {
-		return getGitlabCommitSubjects()
+		return getGitlabCommitData()
 	}
-	return nil, fmt.Errorf("unrecognized git environment %s", repoEnv)
+	return nil, nil, nil, fmt.Errorf("unrecognized git environment %s", repoEnv)
 }
 
 var ErrSubjectList = errors.New("subjects contain errors")
@@ -393,12 +441,18 @@ func (c CommitPolicyConfig) CheckSubjectList(subjects []string) error {
 const requiredCmdlineArgs = 2
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	var repoPath string
 
 	if len(os.Args) < requiredCmdlineArgs {
 		repoPath = "."
 	} else {
 		repoPath = os.Args[1]
+	}
+
+	aspellCheck, err := aspell.New(path.Join(repoPath, ".aspell.yml"))
+	if err != nil {
+		log.Fatalf("error reading aspell exceptions: %s", err)
 	}
 
 	commitPolicy, err := LoadCommitPolicy(path.Join(repoPath, ".check-commit.yml"))
@@ -415,7 +469,7 @@ func main() {
 		log.Fatalf("couldn't auto-detect running environment, please set GITHUB_REF and GITHUB_BASE_REF manually: %s", err)
 	}
 
-	subjects, err := getCommitSubjects(gitEnv)
+	subjects, messages, content, err := getCommitData(gitEnv)
 	if err != nil {
 		log.Fatalf("error getting commit subjects: %s", err)
 	}
@@ -423,6 +477,13 @@ func main() {
 	if err := commitPolicy.CheckSubjectList(subjects); err != nil {
 		log.Printf("encountered one or more commit message errors\n")
 		log.Fatalf("%s\n", commitPolicy.HelpText)
+	}
+
+	err = aspellCheck.Check(subjects, messages, content)
+	if err != nil {
+		log.Printf("encountered one or more commit message spelling errors\n")
+		// log.Fatalf("%s\n", err)
+		log.Fatalf("%s\n", aspellCheck.HelpText)
 	}
 
 	log.Printf("check completed without errors\n")
