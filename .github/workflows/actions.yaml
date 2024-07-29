@@ -6,8 +6,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
   go_build:
     name: Go build
     runs-on: ubuntu-latest
@@ -32,6 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: ["go_build"]
     steps:
+    - name: Install Aspell
+      run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -47,10 +54,12 @@ jobs:
         go test ./...
   check_commit:
     if: ${{ github.event_name == 'pull_request' }}
-    name: HAProxy check commit message
+    name: HAProxy check commit policy
     runs-on: ubuntu-latest
     needs: ["go_build"]
     steps:
+    - name: Install Aspell
+      run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0

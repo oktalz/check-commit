@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
-const customConf = `
+const customConfig = `
 ---
 HelpText: "Please refer to https://github.com/haproxy/haproxy/blob/master/CONTRIBUTING#L632"
 PatchScopes:
@@ -61,7 +61,7 @@ func LoadCommitPolicyData(config string) (CommitPolicyConfig, error) {
 func TestDifferentPolicy(t *testing.T) {
 	t.Parallel()
 
-	c, _ := LoadCommitPolicyData(customConf)
+	c, _ := LoadCommitPolicyData(customConfig)
 
 	testsSpec := []struct {
 		name    string

@@ -32,7 +32,7 @@ bug: fix set-var parsing bug in config-parser
 ```
 BUG/MEDIUM: fix set-var
 ```
-- Unkown severity
+- Unknown severity
 ```
 BUG/MODERATE: fix set-var parsing bug in config-parser
 ```
@@ -95,3 +95,35 @@ TagOrder:
 ### Optional parameters
 
 The program accepts an optional parameter to specify the location (path) of the base of the git repository. This can be useful in certain cases where the checked-out repo is in a non-standard location within the CI environment, compared to the running path from which the check-commit binary is being invoked.
+
+### aspell
+
+to check also spellcheck errors aspell was added. it can be configured with `.aspell.yml`
+
+example
+```yaml
+mode: subject
+min_length: 3
+ignore:
+  - go.mod
+  - go.sum
+  - '*test.go'
+  - 'gen/*'
+allowed:
+  - aspell
+  - config
+```
+
+`min_length` is minimal word size that is checked (default: 3)
+
+`mode` can be set as
+
+- `subject`
+  - `default` option
+  - only subject of commit message will be checked
+- `commit`
+  - whole commit message will be checked
+- `all`
+  - both commit message and all code committed
+- `disabled`
+  - check is disabled
