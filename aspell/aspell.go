@@ -129,13 +129,14 @@ func (a Aspell) Check(subjects []string, commitsFull []string, content []map[str
 				}
 			}
 		}
-		checks = []string{}
+		checks = commitsFull
 	default:
 		checks = subjects
 	}
 
 	for _, subject := range checks {
 		if err := a.checkSingle(subject, []string{}); err != nil {
+			log.Println("commit message", err.Error())
 			response += fmt.Sprintf("%s\n", err)
 		}
 	}
