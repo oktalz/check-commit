@@ -24,10 +24,11 @@ type Aspell struct {
 
 var (
 	camelCaseOK = map[string]struct{}{
-		"HAProxy": {},
-		"golang":  {},
-		"ascii":   {},
-		"api":     {},
+		"HAProxy":    {},
+		"golang":     {},
+		"ascii":      {},
+		"api":        {},
+		"goreleaser": {},
 	}
 	camelCaseNotOK = map[string]struct{}{}
 )
