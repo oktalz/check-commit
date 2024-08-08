@@ -1,4 +1,4 @@
-module github.com/haproxytech/check-commit/v4
+module github.com/haproxytech/check-commit/v5
 
 go 1.22
 

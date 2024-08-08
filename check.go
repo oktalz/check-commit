@@ -16,7 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/haproxytech/check-commit/v4/aspell"
+	"github.com/haproxytech/check-commit/v5/aspell"
 
 	"github.com/google/go-github/v56/github"
 

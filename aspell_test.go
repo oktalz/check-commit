@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/haproxytech/check-commit/v4/aspell"
+	"github.com/haproxytech/check-commit/v5/aspell"
 )
 
 func Test_Aspell(t *testing.T) {
