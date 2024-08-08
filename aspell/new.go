@@ -12,8 +12,10 @@ import (
 func New(filename string) (Aspell, error) {
 	var data []byte
 	var err error
+	fileExists := true
 	if data, err = os.ReadFile(filename); err != nil {
 		log.Printf("warning: aspell exceptions file not found (%s)", err)
+		fileExists = false
 	}
 
 	var aspell Aspell
@@ -42,7 +44,11 @@ func New(filename string) (Aspell, error) {
 	}
 
 	log.Printf("aspell mode set to %s", aspell.Mode)
-	aspell.HelpText = `aspell can be configured with .aspell.yml file.
+	if fileExists {
+		aspell.HelpText = `aspell can be configured with .aspell.yml file.
+Add words to allowed list if its false positive`
+	} else {
+		aspell.HelpText = `aspell can be configured with .aspell.yml file.
 content example:
 mode: subject
 min_length: 3
@@ -55,6 +61,7 @@ allowed:
   - aspell
   - config
 `
+	}
 
 	ignoreFiles := []string{"go.mod", "go.sum"}
 	for _, file := range ignoreFiles {
