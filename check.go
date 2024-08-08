@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -21,6 +22,9 @@ import (
 
 	"github.com/xanzy/go-gitlab"
 	"golang.org/x/oauth2"
+	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing/format/diff"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -84,6 +88,7 @@ TagOrder:
 
 	GITHUB = "Github"
 	GITLAB = "Gitlab"
+	LOCAL  = "local"
 )
 
 var ErrSubjectMessageFormat = errors.New("invalid subject message format")
@@ -222,6 +227,10 @@ func (c CommitPolicyConfig) IsEmpty() bool {
 var ErrGitEnvironment = errors.New("git environment error")
 
 func readGitEnvironment() (string, error) {
+	if os.Getenv("CHECK") == LOCAL {
+		return LOCAL, nil
+	}
+
 	url := os.Getenv("GITHUB_API_URL")
 	if url != "" {
 		log.Printf("detected %s environment\n", GITHUB)
@@ -336,6 +345,97 @@ func getGithubCommitData() ([]string, []string, []map[string]string, error) {
 	}
 }
 
+func getLocalCommitData() ([]string, []string, []map[string]string, error) {
+	repo, err := git.PlainOpen(".")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	iter, err := repo.Log(&git.LogOptions{
+		Order: git.LogOrderCommitterTime,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	subjects := []string{}
+	messages := []string{}
+	diffs := []map[string]string{}
+	committer := ""
+	var commit1 *object.Commit
+	var commit2 *object.Commit
+	for {
+		commit, err := iter.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if committer == "" {
+			committer = commit.Author.Name
+			commit1 = commit
+		}
+
+		if commit.Author.Name != committer {
+			commit2 = commit
+			break
+		}
+
+		commitBody := commit.Message
+		l := strings.SplitN(string(commitBody), "\n", 3)
+		commitHash := commit.Hash.String()
+		if len(commitHash) > 8 {
+			commitHash = commitHash[:8]
+		}
+		if len(l) > 1 {
+			if l[1] != "" {
+				return nil, nil, nil, fmt.Errorf("empty line between subject and body is required: %s %s", commitHash, l[0])
+			}
+		}
+		if len(l) > 0 {
+			subjects = append(subjects, l[0])
+			messages = append(messages, string(commitBody))
+		}
+	}
+
+	// Get the changes (diff) between the two commits
+	tree1, _ := commit1.Tree()
+	tree2, _ := commit2.Tree()
+	changes, err := object.DiffTree(tree2, tree1)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Print the list of changed files and their content (patch)
+	for _, change := range changes {
+		patch, err := change.Patch()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		for _, file := range patch.FilePatches() {
+			chunks := file.Chunks()
+			fileChanges := ``
+
+			for _, chunk := range chunks {
+				if chunk.Type() == diff.Delete {
+					continue
+				}
+				if chunk.Type() == diff.Equal {
+					continue
+				}
+				fileChanges += chunk.Content() + "\n"
+			}
+			if fileChanges == "" {
+				continue
+			}
+
+			diffs = append(diffs, map[string]string{change.To.Name: fileChanges})
+		}
+	}
+	return subjects, messages, diffs, nil
+}
+
 func cleanGitPatch(patch string) string {
 	var cleanedPatch strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(patch))
@@ -413,6 +513,8 @@ func getCommitData(repoEnv string) ([]string, []string, []map[string]string, err
 		return getGithubCommitData()
 	} else if repoEnv == GITLAB {
 		return getGitlabCommitData()
+	} else if repoEnv == LOCAL {
+		return getLocalCommitData()
 	}
 	return nil, nil, nil, fmt.Errorf("unrecognized git environment %s", repoEnv)
 }
@@ -471,7 +573,7 @@ func main() {
 
 	subjects, messages, content, err := getCommitData(gitEnv)
 	if err != nil {
-		log.Fatalf("error getting commit subjects: %s", err)
+		log.Fatalf("error getting commit data: %s", err)
 	}
 
 	if err := commitPolicy.CheckSubjectList(subjects); err != nil {

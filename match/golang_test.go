@@ -26,7 +26,7 @@ func TestGetImportWordsFromFile(t *testing.T) {
 			"Println", "Stdin", "stdout", "stderr", "Stdout", "Stderr",
 			"errorf", "println", "Sprintf", "Printf", "Unmarshal", "args",
 			"Getenv", "Errorf", "tt", "yml", "ok", "cmd", "utf", "Atoi",
-			"oauth",
+			"oauth", "EOF", "exec", "iter",
 			"strings", "slices", "testing",
 		}},
 		{"test 2", "match.go", []string{
@@ -43,7 +43,7 @@ func TestGetImportWordsFromFile(t *testing.T) {
 			"Println", "Stdin", "stdout", "stderr", "Stdout", "Stderr",
 			"errorf", "println", "Sprintf", "Printf", "Unmarshal", "args",
 			"Getenv", "Errorf", "tt", "yml", "ok", "cmd", "utf", "Atoi",
-			"oauth",
+			"oauth", "EOF", "exec", "iter",
 			"filepath", "path", "strings", "regexp",
 		}},
 	}
