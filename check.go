@@ -16,7 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"check-commit/aspell"
+	"github.com/haproxytech/check-commit/aspell"
 
 	"github.com/google/go-github/v56/github"
 
@@ -245,7 +245,8 @@ func readGitEnvironment() (string, error) {
 
 			return GITLAB, nil
 		} else {
-			return "", fmt.Errorf("no suitable git environment variables found: %w", ErrGitEnvironment)
+			return LOCAL, nil
+			// return "", fmt.Errorf("no suitable git environment variables found: %w", ErrGitEnvironment)
 		}
 	}
 }
