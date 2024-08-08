@@ -42,7 +42,7 @@ func GetImportWordsFromGoFile(filename string) []string {
 		"Println", "Stdin", "stdout", "stderr", "Stdout", "Stderr",
 		"errorf", "println", "Sprintf", "Printf", "Unmarshal", "args",
 		"Getenv", "Errorf", "tt", "yml", "ok", "cmd", "utf", "Atoi",
-		"oauth",
+		"oauth", "EOF", "exec", "iter",
 	)
 	findImports(fileContent, "import (", ")", func(data string) {
 		words := strings.FieldsFunc(data, func(r rune) bool {
