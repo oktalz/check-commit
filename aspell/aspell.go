@@ -23,14 +23,27 @@ type Aspell struct {
 }
 
 var (
-	camelCaseOK = map[string]struct{}{
-		"HAProxy":    {},
+	acceptableWordsGlobal = map[string]struct{}{
+		"haproxy":    {},
 		"golang":     {},
 		"ascii":      {},
 		"api":        {},
 		"goreleaser": {},
+		"github":     {},
+		"gitlab":     {},
+		"yaml":       {},
+		"env":        {},
+		"config":     {},
+		"workdir":    {},
+		"entrypoint": {},
+		"sudo":       {},
+		"dockerfile": {},
+		"ghcr":       {},
+		"sed":        {},
+		"stdin":      {},
+		"args":       {},
 	}
-	camelCaseNotOK = map[string]struct{}{}
+	badWordsGlobal = map[string]struct{}{}
 )
 
 func (a Aspell) checkSingle(data string, allowedWords []string) error {
@@ -50,11 +63,11 @@ func (a Aspell) checkSingle(data string, allowedWords []string) error {
 		if len(word) < a.MinLength {
 			continue
 		}
-		if _, ok := camelCaseNotOK[wordLower]; ok {
+		if _, ok := badWordsGlobal[wordLower]; ok {
 			badWords = append(badWords, wordLower)
 			continue
 		}
-		if _, ok := camelCaseOK[wordLower]; ok {
+		if _, ok := acceptableWordsGlobal[wordLower]; ok {
 			continue
 		}
 		if slices.Contains(a.AllowedWords, wordLower) || slices.Contains(allowedWords, wordLower) {
@@ -70,13 +83,13 @@ func (a Aspell) checkSingle(data string, allowedWords []string) error {
 			for _, s := range splitted {
 				er := a.checkSingle(s, allowedWords)
 				if er != nil {
-					camelCaseNotOK[wordLower] = struct{}{}
+					badWordsGlobal[wordLower] = struct{}{}
 					badWords = append(badWords, word+":"+s)
 					break
 				}
 			}
 		} else {
-			camelCaseNotOK[wordLower] = struct{}{}
+			badWordsGlobal[wordLower] = struct{}{}
 			badWords = append(badWords, word)
 		}
 	}
