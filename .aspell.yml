@@ -32,3 +32,8 @@ allowed:
   - MINSUBJECTPARTS
   - malformatted
   - cmdline
+  - Dockerfile
+  - ghcr
+  - sed
+  - stdin
+  - runnumber
