@@ -37,3 +37,4 @@ allowed:
   - sed
   - stdin
   - runnumber
+  - args
