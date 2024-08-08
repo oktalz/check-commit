@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"check-commit/match"
+	"github.com/haproxytech/check-commit/match"
 
 	"github.com/fatih/camelcase"
 )

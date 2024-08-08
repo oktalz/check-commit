@@ -1,4 +1,4 @@
-module check-commit
+module github.com/haproxytech/check-commit
 
 go 1.22
 
