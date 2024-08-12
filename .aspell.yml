@@ -26,4 +26,5 @@ allowed:
   - cmdline
   - sed
   - runnumber
-  - args
+  - LLC
+  - devel

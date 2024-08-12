@@ -42,6 +42,9 @@ var (
 		"sed":        {},
 		"stdin":      {},
 		"args":       {},
+		"arg":        {},
+		"dev":        {},
+		"vcs":        {},
 	}
 	badWordsGlobal = map[string]struct{}{}
 )
