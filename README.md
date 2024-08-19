@@ -104,7 +104,7 @@ example
 ```yaml
 mode: subject
 min_length: 3
-ignore:
+ignore_files:
   - go.mod
   - go.sum
   - '*test.go'

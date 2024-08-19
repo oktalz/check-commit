@@ -52,10 +52,7 @@ Add words to allowed list if its false positive`
 content example:
 mode: subject
 min_length: 3
-ignore:
-  - go.mod
-  - go.sum
-  - '*test.go'
+ignore_files:
   - 'gen/*'
 allowed:
   - aspell
@@ -67,7 +64,7 @@ allowed:
 	for _, file := range ignoreFiles {
 		if _, err := os.Stat(file); err == nil {
 			log.Printf("aspell: added %s to ignore list", file)
-			aspell.Ignore = append(aspell.Ignore, file)
+			aspell.IgnoreFiles = append(aspell.IgnoreFiles, file)
 		}
 	}
 

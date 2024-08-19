@@ -17,7 +17,7 @@ import (
 type Aspell struct {
 	Mode         mode     `yaml:"mode"`
 	MinLength    int      `yaml:"min_length"`
-	Ignore       []string `yaml:"ignore"`
+	IgnoreFiles  []string `yaml:"ignore_files"`
 	AllowedWords []string `yaml:"allowed"`
 	HelpText     string   `yaml:"-"`
 }
@@ -126,7 +126,7 @@ func (a Aspell) Check(subjects []string, commitsFull []string, content []map[str
 		for _, file := range content {
 			for name, v := range file {
 				nextFile := false
-				for _, filter := range a.Ignore {
+				for _, filter := range a.IgnoreFiles {
 					if match.MatchFilter(name, filter) {
 						// log.Println("File", name, "in ignore list")
 						nextFile = true
