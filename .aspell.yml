@@ -1,7 +1,7 @@
 mode: all
 min_length: 3
-ignore:
-  - '*_test.go'
+ignore_files:
+  - '*test.go'
 allowed:
   - aspell
   - repo
