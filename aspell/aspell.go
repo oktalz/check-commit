@@ -113,6 +113,22 @@ func (a Aspell) checkSingle(data string, allowedWords []string) error {
 }
 
 func (a Aspell) Check(subjects []string, commitsFull []string, content []map[string]string) error {
+	var commitsFullData []string
+	for _, c := range commitsFull {
+		c2 := strings.TrimSpace(c)
+		if c2 == "" ||
+			strings.HasPrefix(c2, "Signed-off-by:") ||
+			strings.HasPrefix(c2, "Reviewed-by:") ||
+			strings.HasPrefix(c2, "Tested-by:") ||
+			strings.HasPrefix(c2, "Helped-by:") ||
+			strings.HasPrefix(c2, "Reported-by:") ||
+			strings.HasPrefix(c2, "Author:") ||
+			strings.HasPrefix(c2, "Co-authored-by:") {
+			continue
+		}
+		commitsFullData = append(commitsFullData, c)
+	}
+
 	var response string
 	var checks []string
 	switch a.Mode {
@@ -121,7 +137,7 @@ func (a Aspell) Check(subjects []string, commitsFull []string, content []map[str
 	case modeSubject:
 		checks = subjects
 	case modeCommit:
-		checks = commitsFull
+		checks = commitsFullData
 	case modeAll:
 		for _, file := range content {
 			for name, v := range file {
@@ -146,7 +162,7 @@ func (a Aspell) Check(subjects []string, commitsFull []string, content []map[str
 				}
 			}
 		}
-		checks = commitsFull
+		checks = commitsFullData
 	default:
 		checks = subjects
 	}
